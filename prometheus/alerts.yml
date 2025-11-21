@@ -1,0 +1,112 @@
+groups:
+  - name: gpu_alerts
+    interval: 30s
+    rules:
+      # Alert when GPU is idle for more than 30 minutes
+      - alert: HighGPUIdle
+        expr: (1 - (DCGM_FI_DEV_GPU_UTIL / 100)) * 100 > 80
+        for: 30m
+        labels:
+          severity: warning
+          category: waste
+        annotations:
+          summary: "GPU {{ $labels.gpu }} on {{ $labels.instance }} is idle"
+          description: "GPU {{ $labels.gpu }} utilization is {{ $value | humanize }}% idle for more than 30 minutes. This represents wasted GPU hours."
+          cost_impact: "High - potential 40% waste of GPU hours"
+
+      # Alert when GPU utilization is consistently low
+      - alert: LowGPUUtilization
+        expr: avg_over_time(DCGM_FI_DEV_GPU_UTIL[1h]) < 20
+        for: 1h
+        labels:
+          severity: warning
+          category: waste
+        annotations:
+          summary: "Low GPU utilization on {{ $labels.instance }}"
+          description: "GPU {{ $labels.gpu }} average utilization is {{ $value | humanize }}% over the last hour."
+          recommendation: "Consider downsizing or consolidating workloads"
+
+      # Alert when memory is allocated but not used
+      - alert: VRAMWaste
+        expr: ((DCGM_FI_DEV_FB_USED / DCGM_FI_DEV_FB_FREE) * 100) < 20 and DCGM_FI_DEV_FB_USED > 0
+        for: 30m
+        labels:
+          severity: warning
+          category: vram_misuse
+        annotations:
+          summary: "VRAM allocated but underutilized on GPU {{ $labels.gpu }}"
+          description: "GPU {{ $labels.gpu }} has memory allocated but only {{ $value | humanize }}% utilization. Memory is locked but not effectively used."
+          recommendation: "Review container memory limits and application memory usage"
+
+      # Alert when GPU memory is near capacity
+      - alert: HighVRAMUsage
+        expr: (DCGM_FI_DEV_FB_USED / (DCGM_FI_DEV_FB_USED + DCGM_FI_DEV_FB_FREE)) * 100 > 90
+        for: 10m
+        labels:
+          severity: critical
+          category: capacity
+        annotations:
+          summary: "High VRAM usage on GPU {{ $labels.gpu }}"
+          description: "GPU {{ $labels.gpu }} memory usage is {{ $value | humanize }}%. Risk of OOM errors."
+          recommendation: "Scale up memory or optimize application"
+
+      # Alert for potential container over-allocation
+      - alert: GPUOverAllocation
+        expr: count(DCGM_FI_DEV_GPU_UTIL) by (instance) > 8
+        for: 5m
+        labels:
+          severity: warning
+          category: over_allocation
+        annotations:
+          summary: "Potential GPU over-allocation on {{ $labels.instance }}"
+          description: "Instance {{ $labels.instance }} is reporting more than 8 GPUs, which may indicate container over-allocation."
+          recommendation: "Review GPU allocation policies and container limits"
+
+      # Alert when GPU temperature is high
+      - alert: HighGPUTemperature
+        expr: DCGM_FI_DEV_GPU_TEMP > 85
+        for: 15m
+        labels:
+          severity: warning
+          category: hardware
+        annotations:
+          summary: "High temperature on GPU {{ $labels.gpu }}"
+          description: "GPU {{ $labels.gpu }} temperature is {{ $value }}°C. This may cause throttling and reduce performance."
+          recommendation: "Check cooling systems and workload distribution"
+
+      # Alert for GPU errors
+      - alert: GPUXidErrors
+        expr: rate(DCGM_FI_DEV_XID_ERRORS[5m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+          category: hardware
+        annotations:
+          summary: "GPU XID errors detected on GPU {{ $labels.gpu }}"
+          description: "GPU {{ $labels.gpu }} is experiencing hardware errors. Rate: {{ $value | humanize }} errors/sec."
+          recommendation: "Investigate GPU health immediately - may require hardware replacement"
+
+      # Alert when power usage is high but utilization is low (inefficiency)
+      - alert: InefficientPowerUsage
+        expr: DCGM_FI_DEV_POWER_USAGE > 200 and DCGM_FI_DEV_GPU_UTIL < 30
+        for: 20m
+        labels:
+          severity: info
+          category: waste
+        annotations:
+          summary: "Inefficient power usage on GPU {{ $labels.gpu }}"
+          description: "GPU {{ $labels.gpu }} is consuming {{ $value }}W but utilization is low. Energy waste detected."
+          cost_impact: "Medium - wasting energy costs"
+
+      # Alert when multiple GPUs are idle simultaneously
+      - alert: MultipleIdleGPUs
+        expr: count((1 - (DCGM_FI_DEV_GPU_UTIL / 100)) * 100 > 80) by (instance) > 2
+        for: 30m
+        labels:
+          severity: warning
+          category: waste
+        annotations:
+          summary: "Multiple GPUs idle on {{ $labels.instance }}"
+          description: "Instance {{ $labels.instance }} has {{ $value }} GPUs sitting idle."
+          cost_impact: "Critical - significant waste of GPU resources"
+          recommendation: "Consider shutting down unused instances or redistributing workloads"
