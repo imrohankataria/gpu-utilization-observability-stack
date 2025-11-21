@@ -1,0 +1,86 @@
+global:
+  resolve_timeout: 5m
+  slack_api_url: 'YOUR_SLACK_WEBHOOK_URL_HERE'  # Replace with your Slack webhook URL
+
+# Default route and receiver
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+  receiver: 'default'
+  routes:
+    # Route for waste/cost alerts
+    - match:
+        category: waste
+      receiver: 'cost-optimization-team'
+      continue: true
+    
+    # Route for VRAM misuse
+    - match:
+        category: vram_misuse
+      receiver: 'infrastructure-team'
+      continue: true
+    
+    # Route for over-allocation issues
+    - match:
+        category: over_allocation
+      receiver: 'infrastructure-team'
+      continue: true
+    
+    # Route for hardware issues
+    - match:
+        category: hardware
+      receiver: 'ops-team'
+      severity: critical
+
+receivers:
+  # Default receiver - logs to console
+  - name: 'default'
+    webhook_configs:
+      - url: 'http://localhost:5001/alerts'
+        send_resolved: true
+
+  # Cost optimization team - for waste alerts
+  - name: 'cost-optimization-team'
+    # Uncomment and configure your notification method
+    # slack_configs:
+    #   - channel: '#gpu-cost-optimization'
+    #     title: 'GPU Waste Alert'
+    #     text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}\n{{ .Annotations.cost_impact }}{{ end }}'
+    # email_configs:
+    #   - to: 'cost-team@example.com'
+    #     from: 'alertmanager@example.com'
+    #     smarthost: 'smtp.example.com:587'
+    #     subject: 'GPU Waste Alert: {{ .GroupLabels.alertname }}'
+
+  # Infrastructure team - for allocation and VRAM issues
+  - name: 'infrastructure-team'
+    # Uncomment and configure your notification method
+    # slack_configs:
+    #   - channel: '#gpu-infrastructure'
+    #     title: 'GPU Infrastructure Alert'
+    #     text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}\n{{ .Annotations.recommendation }}{{ end }}'
+    # pagerduty_configs:
+    #   - service_key: 'YOUR_PAGERDUTY_KEY'
+
+  # Ops team - for hardware issues
+  - name: 'ops-team'
+    # Uncomment and configure your notification method
+    # slack_configs:
+    #   - channel: '#gpu-ops-critical'
+    #     title: '🚨 CRITICAL GPU Alert'
+    #     text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}\n{{ .Annotations.recommendation }}{{ end }}'
+    # pagerduty_configs:
+    #   - service_key: 'YOUR_PAGERDUTY_KEY'
+    #     severity: 'critical'
+
+# Inhibit rules - suppress certain alerts when others are firing
+inhibit_rules:
+  # Inhibit low utilization alerts when GPU is down
+  - source_match:
+      severity: 'critical'
+      category: 'hardware'
+    target_match:
+      category: 'waste'
+    equal: ['instance', 'gpu']

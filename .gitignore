@@ -1,0 +1,27 @@
+# Prometheus data
+prometheus_data/
+
+# Grafana data
+grafana_data/
+
+# Docker volumes
+volumes/
+
+# Environment files with secrets
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
