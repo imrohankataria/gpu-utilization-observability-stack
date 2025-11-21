@@ -87,7 +87,7 @@ groups:
           recommendation: "Investigate GPU health immediately - may require hardware replacement"
 
       # Alert when power usage is high but utilization is low (inefficiency)
-      - alert: IneffientPowerUsage
+      - alert: InefficientPowerUsage
         expr: DCGM_FI_DEV_POWER_USAGE > 200 and DCGM_FI_DEV_GPU_UTIL < 30
         for: 20m
         labels:
